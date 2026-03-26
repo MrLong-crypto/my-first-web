@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Math Scanner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Kantumruy Pro', Arial, sans-serif;
+            text-align: center;
+            background: #f0f2f5;
+            padding-top: 20px;
+        }
+        .container {
+            max-width: 400px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .header {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 15px;
+        }
+        video {
+            width: 100%;
+            border-radius: 15px;
+            background: #000;
+        }
+        button {
+            margin-top: 10px;
+            padding: 12px;
+            width: 100%;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-family: inherit;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        button:hover { background: #0056b3; }
+        .btn-solve { background: #28a745; margin-top: 15px; }
+        .btn-solve:hover { background: #218838; }
+        
+        input {
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            border-radius: 10px;
+            border: 1.5px solid #ddd;
+            font-size: 18px;
+            text-align: center;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+        #result {
+            margin-top: 20px;
+            font-size: 22px;
+            font-weight: bold;
+            color: #333;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+    <div class="header">Smart AI Math</div>
+
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <button onclick="capture()">📸 ថត និង ស្កេន​លំហាត់</button>
+
+    <input id="expression" placeholder="លទ្ធផលស្កេននឹងបង្ហាញនៅទីនេះ">
+
+    <button class="btn-solve" onclick="solve()">🧠 គណនាលំហាត</button>
+
+    <div id="result">លទ្ធផល: -</div>
+</div>
+
+<script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    // ចាប់ផ្ដើមកាមេរ៉ា
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+    .then(stream => {
+        video.srcObject = stream;
+    })
+    .catch(err => {
+        alert("មិនអាចបើកកាមេរ៉ាបានទេ: " + err);
+    });
+
+    // ថតរូប និងស្កេនអក្សរ
+    function capture() {
+        const resultDiv = document.getElementById("result");
+        resultDiv.innerText = "កំពុងស្កេន...";
+        
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+
+        Tesseract.recognize(canvas, 'eng')
+        .then(({ data: { text } }) => {
+            document.getElementById("expression").value = cleanText(text);
+            resultDiv.innerText = "ស្កេនរួចរាល់!";
+        });
+    }
+
+    // សំអាតអត្ថបទ និងប្តូរសញ្ញា x ទៅ * និង ÷ ទៅ /
+    function cleanText(text) {
+        return text
+            .toLowerCase()
+            .replace(/x/g, '*')      // ប្តូរ x ទៅជាគុណ (*)
+            .replace(/÷/g, '/')      // ប្តូរ ÷ ទៅជាចែក (/)
+            .replace(/[^0-9+\-*/().^]/g, '') // លុបអក្សរដែលមិនពាក់ព័ន្ធ
+            .replace(/\s/g, '');     // លុបចន្លោះទំនេរ
+    }
+
+    // Function សម្រាប់ដោះស្រាយលំហាត់
+    function solve() {
+        const input = document.getElementById("expression").value;
+        const resultDiv = document.getElementById("result");
+
+        try {
+            // ប្រើ math.js ដើម្បីគណនា (វាស្គាល់ទាំង * និង /)
+            const result = math.evaluate(input);
+            
+            if (result !== undefined) {
+                resultDiv.innerText = "លទ្ធផល: " + result;
+                resultDiv.style.color = "#28a745";
+            } else {
+                resultDiv.innerText = "សូមបញ្ចូលលេខ";
+            }
+        } catch (err) {
+            resultDiv.innerText = "លេខមិនត្រឹមត្រូវ";
+            resultDiv.style.color = "#dc3545";
+        }
+    }
+</script>
+
+</body>
+</html>
