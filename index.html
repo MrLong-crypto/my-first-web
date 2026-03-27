@@ -2,156 +2,171 @@
 <html lang="km">
 <head>
     <meta charset="UTF-8">
-    <title>AI Math Scanner</title>
+    <title>AI Math Scanner - Ultimate Edition</title>
     <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700&display=swap" rel="stylesheet">
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 
     <style>
-        body {
-            font-family: 'Kantumruy Pro', Arial, sans-serif;
-            text-align: center;
-            background: #f0f2f5;
-            padding-top: 20px;
-        }
-        .container {
-            max-width: 400px;
-            margin: auto;
-            background: white;
-            padding: 20px;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        }
-        .header {
-            font-size: 24px;
-            font-weight: bold;
-            color: #007bff;
-            margin-bottom: 15px;
-        }
-        video {
-            width: 100%;
-            border-radius: 15px;
-            background: #000;
-        }
-        button {
-            margin-top: 10px;
-            padding: 12px;
-            width: 100%;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-family: inherit;
-            font-size: 16px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-        button:hover { background: #0056b3; }
-        .btn-solve { background: #28a745; margin-top: 15px; }
-        .btn-solve:hover { background: #218838; }
+        :root { --primary: #007bff; --success: #28a745; --danger: #dc3545; }
+        body { font-family: 'Kantumruy Pro', sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .header { font-size: 28px; font-weight: bold; color: var(--primary); margin-bottom: 20px; }
         
-        input {
-            width: 100%;
-            padding: 12px;
-            margin-top: 15px;
-            border-radius: 10px;
-            border: 1.5px solid #ddd;
-            font-size: 18px;
-            text-align: center;
-            box-sizing: border-box;
-            font-family: inherit;
-        }
-        #result {
-            margin-top: 20px;
-            font-size: 22px;
-            font-weight: bold;
-            color: #333;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 10px;
-        }
+        /* Video & Preview Area */
+        .preview-area { position: relative; width: 100%; background: #000; border-radius: 15px; overflow: hidden; margin-bottom: 15px; min-height: 300px; }
+        video, #image-preview { width: 100%; display: block; }
+        #image-preview { display: none; } /* លាក់ទុកសិន បើមិនទាន់ upload */
+
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        button { padding: 12px; border: none; border-radius: 10px; font-family: inherit; font-size: 16px; cursor: pointer; transition: 0.3s; color: white; }
+        .btn-capture { background: var(--primary); }
+        .btn-upload { background: #6c757d; }
+        .btn-solve { background: var(--success); width: 100%; font-size: 20px; margin-top: 10px; }
+        
+        input { width: 100%; padding: 15px; border-radius: 10px; border: 2px solid #eee; font-size: 20px; text-align: center; box-sizing: border-box; margin-top: 10px; }
+        #result { margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 10px; font-size: 24px; font-weight: bold; min-height: 40px; }
+        
+        .loading-overlay { display: none; color: var(--primary); font-weight: bold; margin: 10px 0; }
+        input[type="file"] { display: none; }
     </style>
 </head>
-
 <body>
 
 <div class="container">
-    <div class="header">Smart AI Math</div>
+    <div class="header">Smart AI Math Scanner 2026</div>
 
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas" style="display:none;"></canvas>
+    <div class="preview-area">
+        <video id="video" autoplay playsinline></video>
+        <img id="image-preview" alt="សញ្ញាបង្ហាញរូបភាព">
+    </div>
 
-    <button onclick="capture()">📸 ថត និង ស្កេន​លំហាត់</button>
+    <div class="controls">
+        <button class="btn-capture" onclick="capture()">📸 ថតរូប</button>
+        <button class="btn-upload" onclick="document.getElementById('fileInput').click()">📁 បញ្ចូលរូប</button>
+    </div>
+    
+    <input type="file" id="fileInput" accept="image/*" onchange="handleFileUpload(event)">
+    <div id="loading" class="loading-overlay">កំពុងវិភាគរូបភាព... សូមរង់ចាំ...</div>
 
     <input id="expression" placeholder="លទ្ធផលស្កេននឹងបង្ហាញនៅទីនេះ">
-
-    <button class="btn-solve" onclick="solve()">🧠 គណនាលំហាត</button>
+    <button class="btn-solve" onclick="solve()">🧠 គណនាលទ្ធផល</button>
 
     <div id="result">លទ្ធផល: -</div>
 </div>
 
+<canvas id="canvas" style="display:none;"></canvas>
+
 <script>
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
+    const imgPreview = document.getElementById("image-preview");
+    const loading = document.getElementById("loading");
+    const expressionInput = document.getElementById("expression");
 
-    // ចាប់ផ្ដើមកាមេរ៉ា
+    // ១. បើកកាមេរ៉ា
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-    .then(stream => {
-        video.srcObject = stream;
-    })
-    .catch(err => {
-        alert("មិនអាចបើកកាមេរ៉ាបានទេ: " + err);
-    });
+    .then(stream => { video.srcObject = stream; })
+    .catch(err => console.log("Camera error: ", err));
 
-    // ថតរូប និងស្កេនអក្សរ
-    function capture() {
-        const resultDiv = document.getElementById("result");
-        resultDiv.innerText = "កំពុងស្កេន...";
-        
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0);
+    // ២. មុខងារ Pre-processing (កែរូបភាពឱ្យច្បាស់ កាត់ក្រឡាចោល)
+    function preprocessImage(canvas) {
+        const ctx = canvas.getContext("2d");
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
 
-        Tesseract.recognize(canvas, 'eng')
-        .then(({ data: { text } }) => {
-            document.getElementById("expression").value = cleanText(text);
-            resultDiv.innerText = "ស្កេនរួចរាល់!";
-        });
+        for (let i = 0; i < data.length; i += 4) {
+            let avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+            // បង្កើន Contrast: បើពណ៌ស្រាលឱ្យទៅជាស បើពណ៌ដិតឱ្យទៅជាខ្មៅ (ជួយលុបក្រឡាសៀវភៅ)
+            let threshold = 130; 
+            let v = (avg > threshold) ? 255 : 0;
+            data[i] = data[i + 1] = data[i + 2] = v;
+        }
+        ctx.putImageData(imageData, 0, 0);
+        return canvas.toDataURL();
     }
 
-    // សំអាតអត្ថបទ និងប្តូរសញ្ញា x ទៅ * និង ÷ ទៅ /
+    // ៣. មុខងារថតរូប
+    function capture() {
+        imgPreview.style.display = "none";
+        video.style.display = "block";
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext("2d").drawImage(video, 0, 0);
+        performOCR(canvas);
+    }
+
+    // ៤. មុខងារ Upload រូបភាព
+    function handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            imgPreview.src = e.target.result;
+            imgPreview.style.display = "block";
+            video.style.display = "none";
+
+            const img = new Image();
+            img.onload = function() {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                canvas.getContext("2d").drawImage(img, 0, 0);
+                performOCR(canvas);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // ៥. ដំណើរការ OCR (ស្កេនអក្សរ)
+    async function performOCR(sourceCanvas) {
+        loading.style.display = "block";
+        expressionInput.value = "";
+        
+        // កែច្នៃរូបភាពមុននឹងបញ្ជូនទៅ Tesseract
+        const processedDataUrl = preprocessImage(sourceCanvas);
+
+        try {
+            const { data: { text } } = await Tesseract.recognize(processedDataUrl, 'eng', {
+                logger: m => console.log(m)
+            });
+            expressionInput.value = cleanText(text);
+        } catch (e) {
+            alert("ស្កេនមិនជោគជ័យ!");
+        } finally {
+            loading.style.display = "none";
+        }
+    }
+// មុខងារសម្អាត និងបម្លែងនិមិត្តសញ្ញាគណិតវិទ្យាគ្រប់ប្រភេទ
     function cleanText(text) {
         return text
             .toLowerCase()
-            .replace(/x/g, '*')      // ប្តូរ x ទៅជាគុណ (*)
-            .replace(/÷/g, '/')      // ប្តូរ ÷ ទៅជាចែក (/)
-            .replace(/[^0-9+\-*/().^]/g, '') // លុបអក្សរដែលមិនពាក់ព័ន្ធ
-            .replace(/\s/g, '');     // លុបចន្លោះទំនេរ
+            .replace(/x/g, '*')           // គុណ
+            .replace(/÷/g, '/')           // ចែក
+            .replace(/√|sqrt/g, 'sqrt')   // ឫស (Geometry/Arithmetic)
+            .replace(/log/g, 'log10')     // ឡូការីត (Algebra)
+            .replace(/ln/g, 'log')        // ឡូការីតនេពែ (Calculus)
+            .replace(/sin|cos|tan/g, m => m) // ត្រីកោណមាត្រ (Geometry)
+            .replace(/²/g, '^2')          // ស្វ័យគុណ
+            .replace(/[^0-9+\-*/().^,a-z]/g, ''); // រក្សាទុកអក្សរសម្រាប់តួមិនស្គាល់ (Algebra)
     }
+  
 
-    // Function សម្រាប់ដោះស្រាយលំហាត់
     function solve() {
-        const input = document.getElementById("expression").value;
+        const input = expressionInput.value;
         const resultDiv = document.getElementById("result");
-
         try {
-            // ប្រើ math.js ដើម្បីគណនា (វាស្គាល់ទាំង * និង /)
-            const result = math.evaluate(input);
-            
-            if (result !== undefined) {
-                resultDiv.innerText = "លទ្ធផល: " + result;
-                resultDiv.style.color = "#28a745";
-            } else {
-                resultDiv.innerText = "សូមបញ្ចូលលេខ";
-            }
-        } catch (err) {
-            resultDiv.innerText = "លេខមិនត្រឹមត្រូវ";
-            resultDiv.style.color = "#dc3545";
+            let res = input.includes("'") 
+                ? "D: " + math.derivative(input.replace(/'/g, ""), 'x').toString()
+                : math.evaluate(input);
+            resultDiv.innerText = "លទ្ធផល: " + (Number.isInteger(res) ? res : res);
+            resultDiv.style.color = "var(--success)";
+        } catch (e) {
+            resultDiv.innerText = "ទម្រង់មិនទាន់ត្រឹមត្រូវ";
+            resultDiv.style.color = "var(--danger)";
         }
     }
 </script>
-
 </body>
 </html>
